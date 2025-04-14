@@ -1,0 +1,16 @@
+<html>
+<head>
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+</head>
+<body>
+    <h1>Virtual Portfolio Dashboard</h1>
+    <p id="portfolio-value">Portfolio Value: </p>
+
+    <script>
+        var socket = io.connect('http://localhost:5000');
+        socket.on('update', function(data) {
+            document.getElementById('portfolio-value').innerText = `Portfolio Value: ${data.portfolio_value}`;
+        });
+    </script>
+</body>
+</html>
