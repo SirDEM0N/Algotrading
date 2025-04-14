@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Virtual Portfolio</title>
+    <script>
+        async function updatePortfolio() {
+            const res = await fetch('/portfolio');
+            const data = await res.json();
+            document.getElementById('value').innerText = data.portfolio_value.toFixed(2);
+        }
+
+        setInterval(updatePortfolio, 5000);
+        window.onload = updatePortfolio;
+    </script>
+</head>
+<body style="background-color:#121212; color:#f0f0f0; font-family:sans-serif;">
+    <h1>📈 Virtual Portfolio</h1>
+    <h2>💰 Value: ₹<span id="value">Loading...</span></h2>
+</body>
+</html>
