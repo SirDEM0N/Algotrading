@@ -4,6 +4,7 @@ import yfinance as yf
 from flask import Flask, jsonify, render_template
 import threading
 import time
+import os
 
 app = Flask(__name__)
 
@@ -20,8 +21,8 @@ df.dropna(inplace=True)
 df.columns = ['_'.join(col).strip() if isinstance(col, tuple) else col for col in df.columns]
 df = df.drop(columns=[col for col in df.columns if 'Ticker' in col])
 df.reset_index(inplace=True)
-df['Datetime'] = pd.to_datetime(df['Datetime'])
-df.set_index('Datetime', inplace=True)
+df['datetime'] = pd.to_datetime(df['Datetime'])
+df.set_index('datetime', inplace=True)
 TICKER = TICKER.upper()
 df.columns = [col.replace(f"_{TICKER}", "").rstrip("_").lower() for col in df.columns]
 
@@ -32,16 +33,16 @@ class TestStrategy(bt.Strategy):
 
     def next(self):
         if not self.position:
-            if self.rsi < 30:
+            if self.rsi[0] < 30:
                 self.buy()
-        elif self.rsi > 70:
+        elif self.rsi[0] > 70:
             self.sell()
 
-# Feed data one bar at a time
+# Custom data feed class
 class LiveFeed(bt.feeds.PandasData):
     params = (('datetime', None),)
 
-# Feed setup
+# Add data to Cerebro
 data = LiveFeed(dataname=df)
 cerebro.adddata(data)
 cerebro.addstrategy(TestStrategy)
@@ -58,26 +59,27 @@ class LiveEngine:
         self.started = True
 
     def step(self):
-        # Check if we have more data
-        if len(self.data) > 0:
-            cerebro._runonce = False
-            cerebro._exactbars = False
-            self.data._advance()  # Step forward one bar
-            self.strategy.next()  # Execute strategy logic
-            global portfolio_value
-            portfolio_value = cerebro.broker.getvalue()
+        try:
+            if not self.data._state == self.data._OVER:
+                self.data._advance()
+                self.strategy.next()
+                global portfolio_value
+                portfolio_value = cerebro.broker.getvalue()
+        except Exception as e:
+            print("Step error:", e)
 
 live_engine = LiveEngine()
 
-# Background updater
+# Background updater thread
 def update_portfolio():
     live_engine.start()
     while True:
         live_engine.step()
-        time.sleep(300)  # 5 minutes
+        time.sleep(300)  # Update every 5 minutes
 
 threading.Thread(target=update_portfolio, daemon=True).start()
 
+# Flask routes
 @app.route('/')
 def home():
     return render_template('index.html')
@@ -86,5 +88,7 @@ def home():
 def get_portfolio():
     return jsonify({"portfolio_value": portfolio_value})
 
+# For Render deployment
 if __name__ == '__main__':
-    app.run(debug=False)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
